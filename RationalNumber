@@ -1,0 +1,163 @@
+import java.math.BigInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+public class RationalNumber {
+    public final static RationalNumber ZERO = new RationalNumber(BigInteger.ZERO, BigInteger.ONE);
+
+    private final BigInteger numerator, denominator;
+
+    private RationalNumber(BigInteger numerator, BigInteger denominator) {
+        this.numerator = numerator;
+        this.denominator = denominator;
+    }
+
+    private static RationalNumber canonical(BigInteger numerator, BigInteger denominator, boolean checkGcd) {
+        if (denominator.signum() == 0) {
+            throw new IllegalArgumentException("denominator is zero");
+        }
+        if (numerator.signum() == 0) {
+            return ZERO;
+        }
+        if (denominator.signum() < 0) {
+            numerator = numerator.negate();
+            denominator = denominator.negate();
+        }
+        if (checkGcd) {
+            BigInteger gcd = numerator.gcd(denominator);
+            if (!gcd.equals(BigInteger.ONE)) {
+                numerator = numerator.divide(gcd);
+                denominator = denominator.divide(gcd);
+            }
+        }
+        return new RationalNumber(numerator, denominator);
+    }
+
+    public static RationalNumber getInstance(long numerator, long denominator) {
+        return canonical(new BigInteger("" + numerator), new BigInteger("" + denominator), true);
+    }
+
+    public static RationalNumber valueOf(String s) {
+        Pattern p = Pattern.compile("(-?\\d+)(?:.(\\d+)?)?0*(?:e(-?\\d+))?");
+        Matcher m = p.matcher(s);
+        if (!m.matches()) {
+            throw new IllegalArgumentException("Unknown format '" + s + "'");
+        }
+        String whole = m.group(1);
+        String decimal = m.group(2);
+        String exponent = m.group(3);
+        String n = whole;
+        if (decimal != null) {
+            n += decimal;
+        }
+        BigInteger numerator = new BigInteger(n);
+        int exp = exponent == null ? 0 : Integer.valueOf(exponent);
+        int decimalPlaces = decimal == null ? 0 : decimal.length();
+        exp -= decimalPlaces;
+        BigInteger denominator;
+        if (exp < 0) {
+            denominator = BigInteger.TEN.pow(-exp);
+        } else {
+            numerator = numerator.multiply(BigInteger.TEN.pow(exp));
+            denominator = BigInteger.ONE;
+        }
+
+        return canonical(numerator, denominator, true);
+    }
+
+    public static void main(String[] args) {
+        RationalNumber r1 = RationalNumber.valueOf("3.14e4");
+        RationalNumber r2 = RationalNumber.getInstance(111, 7);
+        convert("r1", r1);
+        convert("r2", r2);
+        convert("r1 + r2", r1.add(r2));
+        convert("r1 - r2", r1.subtract(r2));
+        convert("r1 * r2", r1.multiply(r2));
+        convert("r1 / r2", r1.divide(r2));
+        convert("r2 ^ 2", r2.pow(2));
+    }
+
+    public static void convert(String name, RationalNumber r) {
+        System.out.printf("%s = %s%n", name, r);
+        System.out.printf("%s.negate() = %s%n", name, r.negate());
+        System.out.printf("%s.invert() = %s%n", name, r.invert());
+        System.out.printf("%s.intValue() = %,d%n", name, r.intValue());
+        System.out.printf("%s.longValue() = %,d%n", name, r.longValue());
+        System.out.printf("%s.floatValue() = %,f%n", name, r.floatValue());
+        System.out.printf("%s.doubleValue() = %,f%n", name, r.doubleValue());
+        System.out.println();
+    }
+
+    public RationalNumber add(RationalNumber o) {
+        if (o.numerator.signum() == 0) {
+            return this;
+        } else if (numerator.signum() == 0) {
+            return o;
+        } else if (denominator.equals(o.denominator)) {
+            return new RationalNumber(numerator.add(o.numerator), denominator);
+        } else {
+            return canonical(numerator.multiply(o.denominator).add(o.numerator.multiply(denominator)), denominator.multiply(o.denominator), true);
+        }
+    }
+
+    public RationalNumber multiply(RationalNumber o) {
+        if (numerator.signum() == 0 || o.numerator.signum() == 0) {
+            return ZERO;
+        } else if (numerator.equals(o.denominator)) {
+            return canonical(o.numerator, denominator, true);
+        } else if (o.numerator.equals(denominator)) {
+            return canonical(numerator, o.denominator, true);
+        } else if (numerator.negate().equals(o.denominator)) {
+            return canonical(o.numerator.negate(), denominator, true);
+        } else if (o.numerator.negate().equals(denominator)) {
+            return canonical(numerator.negate(), o.denominator, true);
+        } else {
+            return canonical(numerator.multiply(o.numerator), denominator.multiply(o.denominator), true);
+        }
+    }
+
+    public boolean isInteger() {
+        return numerator.signum() == 0 || denominator.equals(BigInteger.ONE);
+    }
+
+    public RationalNumber negate() {
+        return new RationalNumber(numerator.negate(), denominator);
+    }
+
+    public RationalNumber invert() {
+        return canonical(denominator, numerator, false);
+    }
+
+    public RationalNumber pow(int exp) {
+        return canonical(numerator.pow(exp), denominator.pow(exp), true);
+    }
+
+    public RationalNumber subtract(RationalNumber o) {
+        return add(o.negate());
+    }
+
+    public RationalNumber divide(RationalNumber o) {
+        return multiply(o.invert());
+    }
+
+    public int intValue() {
+        return isInteger() ? numerator.intValue() : numerator.divide(denominator).intValue();
+    }
+
+    public long longValue() {
+        return isInteger() ? numerator.longValue() : numerator.divide(denominator).longValue();
+    }
+
+    public float floatValue() {
+        return (float) doubleValue();
+    }
+
+    public double doubleValue() {
+        return isInteger() ? numerator.doubleValue() : numerator.doubleValue() / denominator.doubleValue();
+    }
+
+    @Override
+    public String toString() {
+        return isInteger() ? String.format("%,d", numerator) : String.format("%,d / %,d", numerator, denominator);
+    }
+}
